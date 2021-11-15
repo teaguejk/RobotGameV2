@@ -51,7 +51,7 @@ class Robot(DRLRobot):
         # model.add(Flatten())
 
 
-        # model.add(Dense(128, activation='relu'))
+        # model.add(Dense(64, activation='relu'))
         for units in layers:
             model.add(Dense(units, activation=activation, kernel_regularizer=l2(reg_const)))
 
@@ -135,6 +135,15 @@ class Robot(DRLRobot):
                 return True
         return False
 
+    def surrounders(this_robot, game, loc):
+        number_found = 0
+        for loc2 in rg.locs_around(loc):
+            if (loc2 in game.robots):
+                bot2 = game.robots[loc2]
+                if bot2.player_id != this_robot.player_id: number_found += 1
+        # print "surrounders found ", loc, game
+        return number_found
+
     @staticmethod
     def get_reward(game, robot):
         """
@@ -144,54 +153,76 @@ class Robot(DRLRobot):
         :param robot: the robot
         :return: a number indicating reward (higher is better)
         """
+        # [0 move up, 1 move right, 2 move down, 3 move left,
+        # 4 attack up, 5 attack right, 6 attack down, 7 attack left,
+        # 8 guard,
+        # 9 suicide]
+        # print(robot.action)
+
+        move = [0, 1, 2, 3]
+        attack = [4, 5, 6, 7]
         total_reward = 0
         # closest_enemy = robot.closest_enemy(game)
         adj_enemy = Robot.adjacent_enemy(game, robot)
 
         # if dead, neg reward
         if robot.hp <= 0:
-            return -10.0
+            return -0.5
 
         # if alive at end of game, pos reward
         if game.turn == 99:
-            return 10.0
-        # print(robot.location)
-        # print(rg.loc_types(robot.location))
-        # if robot attacks and is above 50 hp, pos reward
-        if robot.action == 'attack' and robot.hp >= 50 and adj_enemy:
-            total_reward += 8.0
+            return 0.5
+
+        # if robot attacks and is above 50 hp and deals damage, pos reward
+        if robot.action in attack and robot.hp >= 50 and adj_enemy and robot.damage_caused > 0:
+            total_reward += 1.5
 
         # if robot moves while below 50 hp, pos reward
-        if robot.action == 'move' and robot.hp < 50:
-            total_reward += 2.0
+        if robot.action in move and robot.hp < 50:
+            total_reward += 0.2
 
         # if robot is in spawn, neg reward
         if 'spawn' in rg.loc_types(robot.location):
-            total_reward += -10.0
+            total_reward += -0.5
 
         # if robot attacks with enemy 2 away and no enemies are adjacent, pos reward
         if 'spawn' not in rg.loc_types(robot.location):
             enemy_2away = Robot.check_if_enemy_is_2away(game, robot)
-            if robot.action == 'attack' and enemy_2away and not adj_enemy:
-                total_reward += 10
+            if robot.action in attack and enemy_2away and not adj_enemy:
+                total_reward += 0.4
 
         # if loc is <= 5 spaces from center, pos reward
         if rg.wdist(robot.location, rg.CENTER_POINT) <= 5:
-            total_reward += 8.0
+            total_reward += 0.2
 
+        # if loc is > 5 spaces from center, pos reward
+        if rg.wdist(robot.location, rg.CENTER_POINT) > 5:
+            total_reward += -0.1
+
+        # suicide is not the answer, neg reward
+        if robot.action == 9:
+            total_reward += -5
+
+        # if robot.damage_caused > 0:
+        #     total_reward += 5
+
+        # print(robot.damage_caused)
+        # # if suicide and successful, pos reward, else suicide, neg reward
+        # if (robot.hp <= 10) and robot.action == 9 and Robot.surrounders(robot, game, robot.location):
+        #     # successful suicide
+        #     total_reward += 10.0
+        # elif (robot.hp <= 10) and robot.action == 9:
+        #     total_reward += -20.0
+        #
+        # # if surrounded and guard, pos reward
+        # if robot.action == 8 and Robot.surrounders(robot, game, robot.location):
+        #     # successful guard
+        #     total_reward += 8.0
+        # elif robot.action == 8:
+        #     total_reward += -10.0
+
+        # print(total_reward)
         return total_reward
-
-        # if robot.hp <= 0:
-        #     # death
-        #     return -1.0
-        # elif game.turn == 99:
-        #     # survive
-        #     return 1.0
-        # elif game.get_actions_on_turn() == 'attack' and robot.hp >= 50:
-        #     return 1
-        # else:
-        #     # otherwise
-        #     return 0.0
 
 
 def main():
@@ -204,6 +235,7 @@ def main():
         'memory_size': 10000,  # roughly 10 games worth of actions
         'reg_const': 0.000,
         'epsilon_decay': 0.99,
+        # 'state_size': (6,),
         'state_size': (10,),
         'action_size': 10,
     }
@@ -258,6 +290,17 @@ def main():
         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     ], dtype=np.float32)
+
+    # check_states = np.array([
+    #     [0, 0, 0, 0, 0, 0],
+    #     [0, 1, 0, 0, 0, 0],
+    #     [1, 0, 0, 0, 0, 0],
+    #     [1, 1, 0, 0, 0, 0],
+    #     [0, 0, 1, 0, 0, 0],
+    #     [0, 0, 0, 1, 0, 0],
+    #     [0, 0, 0, 0, 1, 0],
+    #     [0, 0, 0, 0, 0, 1]
+    # ], dtype=np.float32)
 
     logger.info('\n' + str(robot1.model(check_states).numpy().round(2)))
 
