@@ -1,0 +1,1 @@
+{"learning_rate": 0.001, "layers": [32, 32], "activation": "relu", "mini_batch_size": 1000, "memory_size": 10000, "reg_const": 0.0, "epsilon_decay": 0.99, "state_size": [6], "action_size": 10}
