@@ -52,7 +52,6 @@ def locs_around(loc, filter_out=None):
     return [a_loc for a_loc in _locs_around(loc)
             if len(filter_out & loc_types(a_loc)) == 0]
 
-
 def _sign(x):
     return x and 1 if x > 0 else -1
 

@@ -12,7 +12,7 @@ from rgkit import game as rg_game
 from rgkit.settings import settings
 from tensorflow.keras.models import load_model
 
-np.set_printoptions(precision=2, suppress=True)
+np.set_printoptions(precision=3, suppress=True)
 
 # noinspection SpellCheckingInspection
 with open('rgkit/maps/default.py') as _:
@@ -80,17 +80,8 @@ class DRLRobot:
         self.state = None
         self.action = None
 
-        self.min_reward = float('inf')
-        self.max_reward = float('-inf')
-
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
-        if reward < self.min_reward:
-            print(f'New minimum reward: {reward}')
-            self.min_reward = reward
-        if reward > self.max_reward:
-            print(f'New maximum reward: {reward}')
-            self.max_reward = reward
 
     def percept(self, game, robot):
         """
@@ -133,12 +124,8 @@ class DRLRobot:
             # get allies
             allies = np.array([r for r in list(game.robots.values()) + list(game.zombies.values())
                                if r.player_id == self.player_id])
-
             # determine which will play randomly
-            if self.exploit:
-                random_index = np.zeros(len(allies), dtype=bool)
-            else:
-                random_index = np.random.rand(len(allies)) <= self.epsilon
+            random_index = np.random.rand(len(allies)) <= self.epsilon
 
             num_deterministic = 0
             for i, bot in enumerate(allies):
@@ -256,21 +243,15 @@ def get_player(path):
         spec = spec_from_file_location('robot_game', robot_file)
         module = module_from_spec(spec)
         spec.loader.exec_module(module)
-
-        robot = getattr(module, 'Robot')(model_dir=path, **model_params)
     else:
         # if it's a robot file
         import importlib
         module = importlib.import_module(path)
-        robot = getattr(module, 'Robot')()
-
+        model_params = {}
+    robot = getattr(module, 'Robot')(**model_params)
     return rg_game.Player(robot=robot), robot
 
 
-def main():
+if __name__ == '__main__':
     player, robot = get_player('drl_robot/20211104224501')
     print(player, robot)
-
-
-if __name__ == '__main__':
-    main()

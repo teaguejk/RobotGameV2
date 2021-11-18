@@ -32,7 +32,7 @@ class GameState(object):
         else:
             self._get_spawn_locations = self._get_spawn_locations_random
 
-    def add_robot(self, loc, player_id, damage_caused=0, state=None, action=None, hp=None, robot_id=None):
+    def add_robot(self, loc, player_id, damage_caused=0, damage_taken=0, kills=0, state=None, action=None, hp=None, robot_id=None):
         # RMP: additional robot fields to parameter list here.
         if hp is None:
             hp = settings.robot_hp
@@ -48,6 +48,8 @@ class GameState(object):
             'robot_id': robot_id,
             # RMP: additional robot fields here.
             'damage_caused': damage_caused,
+            'damage_taken': damage_taken,
+            'kills': kills,
             'state': state,
             'action': action,
             # RMP: additional fields to fill at the start of next turn
@@ -193,6 +195,12 @@ class GameState(object):
         for robot_delta in delta:
             robot_delta.damage_caused += damage_caused[robot_delta.loc]
 
+    # RMP
+    @staticmethod
+    def _apply_kills(delta, kills):
+        for robot_delta in delta:
+            robot_delta.kills += kills[robot_delta.loc]
+
     @staticmethod
     def _apply_spawn(delta, spawn_locations):
         # clear robots on spawn
@@ -212,6 +220,7 @@ class GameState(object):
                     'hp_end': settings.robot_hp,
                     'damage_caused': 0,
                     # RMP: add new fields here:
+                    'kills': 0,
                     'state': None,
                     'action': None,
                 }))
@@ -240,6 +249,7 @@ class GameState(object):
         collisions = self._get_collisions(destination, contenders)
         damage_map = self._get_damage_map(actions)
         damage_caused = defaultdict(lambda: 0)  # {loc: damage_caused}
+        kills = defaultdict(lambda: 0)  # {loc: kills}
 
         for loc, robot in self.robots.items():
             robot_delta = AttrDict({
@@ -249,6 +259,7 @@ class GameState(object):
                 'loc_end': new_locations[loc],
                 'hp_end': robot.hp,  # to be adjusted
                 'damage_caused': 0,  # to be adjusted
+                'kills': 0,  # to be adjusted
                 # RMP: track state and action
                 'state': robot.state,
                 'action': robot.action,
@@ -262,6 +273,10 @@ class GameState(object):
 
                 for other_loc in collisions[loc]:
                     if robot.player_id != self.robots[other_loc].player_id:
+                        # RMP count kills
+                        if robot_delta.hp_end <= damage:
+                            kills[other_loc] += 1
+
                         robot_delta.hp_end -= damage
                         damage_caused[other_loc] += damage
 
@@ -273,16 +288,23 @@ class GameState(object):
                         if is_guard:
                             damage //= 2
 
+                        # RMP count kills
+                        if robot_delta.hp_end <= damage:
+                            kills[actor_loc] += 1
+
                         robot_delta.hp_end -= damage
                         damage_caused[actor_loc] += damage
 
             # account for suicides and deserters
             if actions[loc][0] in ('suicide', 'desert'):
                 robot_delta.hp_end = 0
+                # RMP killing yourself doesn't count as as kill
 
             delta.append(robot_delta)
 
         self._apply_damage_caused(delta, damage_caused)
+        # RMP: apply kills
+        self._apply_kills(delta, kills)
 
         if spawn and self.turn % settings.spawn_every == 0:
             self._apply_spawn(delta, self._get_spawn_locations())
@@ -315,14 +337,17 @@ class GameState(object):
             # is this a new robot?
             if delta_info.hp > 0:
                 robot_id = self.robots[loc].robot_id
+                damage_taken = delta_info.hp - max(delta_info.hp_end, 0)
             else:
                 robot_id = None
+                damage_taken = 0
 
             # RMP: additional fields as input arguments here
+
             new_state.add_robot(delta_info.loc_end, delta_info.player_id,
                                 # RMP: new fields here:
-                                delta_info.damage_caused, delta_info.state, delta_info.action,
-                                delta_info.hp_end, robot_id)
+                                delta_info.damage_caused, damage_taken, delta_info.kills, delta_info.state,
+                                delta_info.action, delta_info.hp_end, robot_id)
 
         return new_state
 
