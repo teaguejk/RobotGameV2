@@ -1,0 +1,23 @@
+Robot Game V2
+======================================
+Strategies
+attack moving enemy
+running
+looking for weak enemies
+kiting
+
+======================================
+Changes
+
+
+======================================
+Report topics
+
+started off adding useless rewards
+confused about the drl methods
+learned simpler rewards
+act method in helpers file
+added more layers and increased units
+new v3 model instantly starts beating guard bot
+beating random bot
+progress for dulladob
