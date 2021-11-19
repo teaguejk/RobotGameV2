@@ -203,7 +203,7 @@ def main():
     if len(sys.argv) > 1:
         opponent = sys.argv[1]
     else:
-        opponent = 'dulladob'
+        opponent = 'guard_bot'
 
     if len(sys.argv) > 2:
         model_dir = sys.argv[2]
